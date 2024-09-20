@@ -2,6 +2,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import PostgresErrorCode from '../../database/enums/postgres-error-code.enum';
 import { UsersService } from '../../users/services/users.service';
+import RegisterDto from '../dto/register.dto';
 
 export class AuthenticationService {
   constructor(private readonly usersService: UsersService) {}
@@ -41,6 +42,8 @@ export class AuthenticationService {
 
       return user;
     } catch (error) {
+      console.error(error);
+
       throw new HttpException(
         'Wrong credentials provided',
         HttpStatus.BAD_REQUEST,
