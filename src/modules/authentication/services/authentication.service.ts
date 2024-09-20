@@ -1,11 +1,19 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import PostgresErrorCode from '../../database/enums/postgres-error-code.enum';
 import { UsersService } from '../../users/services/users.service';
 import RegisterDto from '../dto/register.dto';
+import TokenPayload from '../interfaces/token-payload.interface';
 
+@Injectable()
 export class AuthenticationService {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
   public async register(registrationData: RegisterDto) {
     const hashedPassword = await bcrypt.hash(registrationData.password, 10);
@@ -27,6 +35,8 @@ export class AuthenticationService {
         );
       }
 
+      console.error(error);
+
       throw new HttpException(
         'Something went wrong',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -37,7 +47,7 @@ export class AuthenticationService {
   public async getAuthenticatedUser(email: string, plainTextPassword: string) {
     try {
       const user = await this.usersService.getByEmail(email);
-      this.verifyPassword(plainTextPassword, user.password);
+      await this.verifyPassword(plainTextPassword, user.password);
       user.password = undefined;
 
       return user;
@@ -49,6 +59,17 @@ export class AuthenticationService {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  public getCookieWithJwtToken(userId: number) {
+    const payload: TokenPayload = { userId };
+    const token = this.jwtService.sign(payload);
+
+    return `Authentication=${token}; HttpOnly; Path=/; Max-Age=${this.configService.get('JWT_EXPIRATION_TIME')}`;
+  }
+
+  public getCookieForLogOut() {
+    return `Authentication=; HttpOnly; Path=/; Max-Age=0`;
   }
 
   private async verifyPassword(
